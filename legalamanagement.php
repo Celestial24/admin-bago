@@ -986,8 +986,8 @@ try {
                                 <td><?php echo htmlspecialchars($contract['risk_score']); ?>/100</td>
                                 <td><?php echo date('Y-m-d', strtotime($contract['created_at'])); ?></td>
                                 <td>
-                                    <button class="action-btn view-btn">View</button>
-                                    <button class="action-btn analyze-btn" data-contract='<?php echo htmlspecialchars(json_encode($contract)); ?>'>Analyze</button>
+                                    <button class="action-btn view-btn" data-action-type="view" data-contract-id="<?php echo $contract['id']; ?>">View</button>
+                                    <button class="action-btn analyze-btn" data-action-type="analyze" data-contract='<?php echo htmlspecialchars(json_encode($contract)); ?>'>Analyze</button>
                                     <?php if (!empty($contract['file_path'])): ?>
                                         <button class="action-btn download-btn" data-file="<?php echo htmlspecialchars($contract['file_path']); ?>">Download</button>
                                     <?php endif; ?>
@@ -1035,8 +1035,40 @@ try {
         </div>
     </div>
 
+    <!-- Details Modal (Used for View/Analyze) -->
+    <div id="detailsModal" style="display:none; position:fixed; left:0; top:0; right:0; bottom:0; background:rgba(0,0,0,0.5); align-items:center; justify-content:center; z-index:1000;">
+        <div style="background:white; width:90%; max-width:600px; border-radius:8px; padding:20px; position:relative;">
+            <button id="closeDetails" style="position:absolute; right:12px; top:12px; background:#e74c3c; color:white; border:none; padding:6px 10px; border-radius:4px; cursor:pointer;">Close</button>
+            <h3 id="detailsTitle">Details</h3>
+            <div id="detailsBody">
+                <!-- dynamic content -->
+            </div>
+        </div>
+    </div>
+
+    <!-- PIN Modal (Idinagdag para sa View/Analyze) -->
+    <div id="pinModal" style="display:none; position:fixed; left:0; top:0; right:0; bottom:0; background:rgba(0,0,0,0.7); align-items:center; justify-content:center; z-index:1100;">
+        <div class="login-form" style="background:white; padding: 40px; border-radius: 10px; box-shadow: 0 10px 30px rgba(0, 0, 0, 0.2); width: 100%; max-width: 350px; text-align: center;">
+            <h3 style="margin-bottom: 20px;">Access Secured Content</h3>
+            <p style="margin-bottom: 15px; color:#e74c3c; font-weight: 500;">Enter PIN to View/Analyze Contract</p>
+            <div class="pin-input">
+                <input type="password" maxlength="1" class="pin-digit-action" id="action-pin1" data-index="0" style="width: 50px; height: 50px; margin: 0 5px; text-align: center; font-size: 24px; border: 2px solid #ddd; border-radius: 5px; outline: none;">
+                <input type="password" maxlength="1" class="pin-digit-action" id="action-pin2" data-index="1" style="width: 50px; height: 50px; margin: 0 5px; text-align: center; font-size: 24px; border: 2px solid #ddd; border-radius: 5px; outline: none;">
+                <input type="password" maxlength="1" class="pin-digit-action" id="action-pin3" data-index="2" style="width: 50px; height: 50px; margin: 0 5px; text-align: center; font-size: 24px; border: 2px solid #ddd; border-radius: 5px; outline: none;">
+                <input type="password" maxlength="1" class="pin-digit-action" id="action-pin4" data-index="3" style="width: 50px; height: 50px; margin: 0 5px; text-align: center; font-size: 24px; border: 2px solid #ddd; border-radius: 5px; outline: none;">
+            </div>
+            <button class="login-btn" id="confirmActionPinBtn" style="width: 100%; background: #4a6cf7;">Confirm</button>
+            <div class="error-message" id="actionPinError" style="color: #e74c3c; margin-top: 10px; display: none;">Invalid PIN.</div>
+            <button class="cancel-btn" id="cancelActionPinBtn" style="width: 100%; margin-top: 10px; background: #95a5a6;">Cancel</button>
+        </div>
+    </div>
+
     <script>
-        // PIN Authentication
+        // Global variables to store context for PIN validation
+        let pendingAction = null;
+        const ACCESS_PIN = '1234'; // Ang password na gusto ng user
+
+        // PIN Authentication for Initial Login
         document.addEventListener('DOMContentLoaded', function() {
             const pinInputs = document.querySelectorAll('.pin-digit');
             const loginBtn = document.getElementById('loginBtn');
@@ -1045,13 +1077,13 @@ try {
             const dashboard = document.getElementById('dashboard');
             const logoutBtn = document.getElementById('logoutBtn');
             
-            // Correct PIN (in a real application, this would be stored securely)
-            const correctPIN = '1234';
+            // Correct PIN for initial login (Assuming '1234' for consistency, but checking the code, the initial login PIN is hardcoded to '1234' on top)
+            const correctPIN = '1234'; 
             
             // Focus on first PIN input
-            pinInputs[0].focus();
+            if(pinInputs.length > 0) pinInputs[0].focus();
             
-            // Move to next input when a digit is entered
+            // Move to next input when a digit is entered (Initial Login)
             pinInputs.forEach((input, index) => {
                 input.addEventListener('input', function() {
                     if (this.value.length === 1 && index < pinInputs.length - 1) {
@@ -1523,61 +1555,122 @@ try {
                     }
                 });
             }
-        });
 
-        // Enhanced Analyze button handler with AI analysis display
-        document.addEventListener('click', function(e) {
-            // View button handler
-            if (e.target && e.target.classList.contains('view-btn')) {
-                const row = e.target.closest('tr');
-                if (!row) return;
+            // === PIN Validation for View/Analyze ===
+            const pinModal = document.getElementById('pinModal');
+            const pinDigitsAction = document.querySelectorAll('.pin-digit-action');
+            const confirmActionPinBtn = document.getElementById('confirmActionPinBtn');
+            const cancelActionPinBtn = document.getElementById('cancelActionPinBtn');
+            const actionPinError = document.getElementById('actionPinError');
 
-                const tbody = row.closest('tbody');
-                if (tbody && tbody.id === 'employeesTableBody') {
-                    const cells = row.querySelectorAll('td');
-                    const info = {
-                        'Employee ID': cells[0] ? cells[0].innerText.trim() : '',
-                        'Name': cells[1] ? cells[1].innerText.trim() : '',
-                        'Position': cells[2] ? cells[2].innerText.trim() : '',
-                        'Email': cells[3] ? cells[3].innerText.trim() : '',
-                        'Phone': cells[4] ? cells[4].innerText.trim() : ''
-                    };
-
-                    let html = '<div style="line-height:1.6;">';
-                    for (const key in info) {
-                        html += '<div style="margin-bottom:8px;"><strong>' + key + ':</strong> ' + info[key] + '</div>';
-                    }
-                    html += '</div>';
-
-                    document.getElementById('detailsTitle').innerText = 'Employee Details';
-                    document.getElementById('detailsBody').innerHTML = html;
-                    document.getElementById('detailsModal').style.display = 'flex';
-                } else if (tbody && tbody.id === 'contractsTableBody') {
-                    const cells = row.querySelectorAll('td');
-                    const info = {
-                        'Contract Name': cells[0] ? cells[0].innerText.trim() : '',
-                        'Case ID': cells[1] ? cells[1].innerText.trim() : '',
-                        'Risk Level': cells[2] ? cells[2].innerText.trim() : '',
-                        'Risk Score': cells[3] ? cells[3].innerText.trim() : '',
-                        'Upload Date': cells[4] ? cells[4].innerText.trim() : ''
-                    };
-
-                    let html = '<div style="line-height:1.6;">';
-                    for (const key in info) {
-                        html += '<div style="margin-bottom:8px;"><strong>' + key + ':</strong> ' + info[key] + '</div>';
-                    }
-                    html += '</div>';
-
-                    document.getElementById('detailsTitle').innerText = 'Contract Details';
-                    document.getElementById('detailsBody').innerHTML = html;
-                    document.getElementById('detailsModal').style.display = 'flex';
-                }
+            function openPinModal(actionType, contractData = null) {
+                actionPinError.style.display = 'none';
+                pinDigitsAction.forEach(input => input.value = '');
+                pinModal.style.display = 'flex';
+                
+                pendingAction = { type: actionType, data: contractData };
+                
+                if(pinDigitsAction.length > 0) pinDigitsAction[0].focus();
             }
 
-            // Analyze button handler for contracts with AI analysis
-            if (e.target && e.target.classList.contains('analyze-btn')) {
-                const contractData = JSON.parse(e.target.getAttribute('data-contract'));
+            function closePinModal() {
+                pinModal.style.display = 'none';
+                pendingAction = null;
+            }
+
+            function proceedWithAction() {
+                closePinModal();
+                if (!pendingAction) return;
+
+                if (pendingAction.type === 'view') {
+                    // Trigger the original View logic
+                    showContractDetails(pendingAction.data);
+                } else if (pendingAction.type === 'analyze') {
+                    // Trigger the original Analyze logic
+                    showAiAnalysis(pendingAction.data);
+                }
+            }
+            
+            // Re-map the pin digit input logic for the action modal
+            pinDigitsAction.forEach((input, index) => {
+                input.addEventListener('input', function() {
+                    if (this.value.length === 1 && index < pinDigitsAction.length - 1) {
+                        pinDigitsAction[index + 1].focus();
+                    }
+                });
                 
+                input.addEventListener('keydown', function(e) {
+                    if (e.key === 'Backspace' && this.value.length === 0 && index > 0) {
+                        pinDigitsAction[index - 1].focus();
+                    }
+                });
+            });
+
+            confirmActionPinBtn.addEventListener('click', function() {
+                const enteredPIN = Array.from(pinDigitsAction).map(input => input.value).join('');
+                
+                if (enteredPIN === ACCESS_PIN) {
+                    proceedWithAction();
+                } else {
+                    actionPinError.style.display = 'block';
+                    pinDigitsAction.forEach(input => input.value = '');
+                    if(pinDigitsAction.length > 0) pinDigitsAction[0].focus();
+                }
+            });
+
+            cancelActionPinBtn.addEventListener('click', closePinModal);
+
+            // Updated master click listener to intercept View/Analyze
+            document.addEventListener('click', function(e) {
+                const isViewBtn = e.target && e.target.classList.contains('view-btn');
+                const isAnalyzeBtn = e.target && e.target.classList.contains('analyze-btn');
+
+                if (isViewBtn || isAnalyzeBtn) {
+                    const row = e.target.closest('tr');
+                    const cells = row.querySelectorAll('td');
+                    let actionType = isViewBtn ? 'view' : 'analyze';
+                    let contractData = null;
+
+                    if (e.target.hasAttribute('data-contract')) {
+                        contractData = JSON.parse(e.target.getAttribute('data-contract'));
+                    } else if (actionType === 'view') {
+                         // Build minimal data structure for view action if not in data-contract
+                         contractData = {
+                            contract_name: cells[0] ? cells[0].innerText.trim() : '',
+                            case_id: cells[1] ? cells[1].innerText.trim() : '',
+                            risk_level: cells[2] ? cells[2].innerText.trim() : '',
+                            risk_score: cells[3] ? cells[3].innerText.trim() : '',
+                            upload_date: cells[4] ? cells[4].innerText.trim() : '',
+                        };
+                    }
+
+                    e.preventDefault(); // Stop default action immediately
+                    openPinModal(actionType, contractData);
+                }
+            });
+
+            // Original logic for displaying details/analysis (now wrapped in functions)
+            function showContractDetails(contractInfo) {
+                const info = {
+                    'Contract Name': contractInfo.contract_name,
+                    'Case ID': contractInfo.case_id,
+                    'Risk Level': contractInfo.risk_level,
+                    'Risk Score': contractInfo.risk_score,
+                    'Upload Date': contractInfo.upload_date
+                };
+
+                let html = '<div style="line-height:1.6;">';
+                for (const key in info) {
+                    html += '<div style="margin-bottom:8px;"><strong>' + key + ':</strong> ' + info[key] + '</div>';
+                }
+                html += '</div>';
+
+                document.getElementById('detailsTitle').innerText = 'Contract Details';
+                document.getElementById('detailsBody').innerHTML = html;
+                document.getElementById('detailsModal').style.display = 'flex';
+            }
+            
+            function showAiAnalysis(contractData) {
                 let riskFactorsHtml = '';
                 let recommendationsHtml = '';
                 
@@ -1637,8 +1730,12 @@ try {
                 document.getElementById('detailsBody').innerHTML = html;
                 document.getElementById('detailsModal').style.display = 'flex';
             }
+        });
 
-            // Download button handler for contracts
+        // Enhanced Analyze button handler with AI analysis display (Removed original listener, replaced by master click handler)
+
+        // Download button handler for contracts
+        document.addEventListener('click', function(e) {
             if (e.target && e.target.classList.contains('download-btn')) {
                 const filePath = e.target.getAttribute('data-file');
                 if (filePath) {
@@ -1661,15 +1758,6 @@ try {
         });
     </script>
 
-    <!-- Details Modal -->
-    <div id="detailsModal" style="display:none; position:fixed; left:0; top:0; right:0; bottom:0; background:rgba(0,0,0,0.5); align-items:center; justify-content:center; z-index:1000;">
-        <div style="background:white; width:90%; max-width:600px; border-radius:8px; padding:20px; position:relative;">
-            <button id="closeDetails" style="position:absolute; right:12px; top:12px; background:#e74c3c; color:white; border:none; padding:6px 10px; border-radius:4px; cursor:pointer;">Close</button>
-            <h3 id="detailsTitle">Details</h3>
-            <div id="detailsBody">
-                <!-- dynamic content -->
-            </div>
-        </div>
-    </div>
+    
 </body>
 </html>
