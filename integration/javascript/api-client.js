@@ -1,6 +1,6 @@
 /**
  * API Client - JavaScript Integration
- * Handles all API communications and data management
+ * Handles all API communications and data management, including external Procurement API.
  */
 
 class APIClient {
@@ -9,8 +9,12 @@ class APIClient {
         this.endpoints = {
             frontDesk: `${this.baseURL}/core1/front-desk-api.php`,
             hrSelfService: `${this.baseURL}/hr2/employee-self-service-api.php`,
-            warehousing: `${this.baseURL}/log1/smart-warehousing-api.php`,
-            base: `${this.baseURL}/api/base-api.php`
+            // LOG1 Internal API for Inventory/Warehousing CRUD
+            warehousing: `${this.baseURL}/log1/smart-warehousing-api.php`, 
+            base: `${this.baseURL}/api/base-api.php`,
+            
+            // EXTERNAL Procurement API for Purchase Orders
+            procurementPO: 'https://logistics1.atierahotelandrestaurant.com/api/procurement/purchase-order.php' 
         };
         this.sessionToken = this.getSessionToken();
         this.requestQueue = [];
@@ -80,10 +84,26 @@ class APIClient {
 
         try {
             const response = await fetch(request.endpoint, config);
-            const result = await response.json();
+            
+            // Try to parse JSON result. Some successful external APIs (like procurementPO) might not wrap data.
+            let result;
+            try {
+                result = await response.json();
+            } catch (e) {
+                // If it's a non-JSON response but the status is OK, treat it as successful raw data (or empty object)
+                if (response.ok) {
+                    result = { message: 'Raw response OK', data: await response.text() };
+                } else {
+                    // If parsing failed and status is not OK, throw generic error
+                     throw new Error(`API returned status ${response.status} but no valid JSON body.`);
+                }
+            }
+
 
             if (!response.ok) {
-                throw new APIError(result.message || 'Request failed', response.status, result);
+                // Use response status if available, otherwise use generic message
+                const errorMessage = (result && result.message) ? result.message : `Request failed with status ${response.status}.`;
+                throw new APIError(errorMessage, response.status, result);
             }
 
             // Log successful request
@@ -147,7 +167,11 @@ class APIClient {
 
     isRateLimited() {
         const now = Date.now();
-        const recentRequests = this.getRecentRequests(now - 60000); // Last minute
+        // Assuming getRecentRequests is implemented elsewhere, filtering the queue based on timestamp
+        // For simplicity in this fix, we'll use a placeholder and rely on network checks primarily.
+        
+        // Placeholder implementation based on conversation history context:
+        const recentRequests = this.requestQueue.filter(req => req.timestamp > (now - 60000));
         return recentRequests.length > 60; // Max 60 requests per minute
     }
 
@@ -157,12 +181,13 @@ class APIClient {
 
     shouldRetry(error, request) {
         if (request.retryCount >= 3) return false;
-        if (error.status >= 400 && error.status < 500) return false;
+        if (error instanceof APIError && error.status >= 400 && error.status < 500) return false;
         return true;
     }
 
     async retryRequest(request) {
         request.retryCount = (request.retryCount || 0) + 1;
+        // console.log(`Retrying request ${request.id}. Attempt ${request.retryCount}`); // Avoid logging retries
         const delay = Math.pow(2, request.retryCount) * 1000; // Exponential backoff
         
         await new Promise(resolve => setTimeout(resolve, delay));
@@ -180,8 +205,8 @@ class APIClient {
         // Response interceptor
         this.addResponseInterceptor((response) => {
             // Update session token if provided
-            if (response.headers['X-New-Token']) {
-                this.setSessionToken(response.headers['X-New-Token']);
+            if (response.headers.get('X-New-Token')) { // Use .get() for consistency
+                this.setSessionToken(response.headers.get('X-New-Token'));
             }
             return response;
         });
@@ -244,7 +269,14 @@ class APIClient {
         this.showNotification(`Error: ${error.message}`, 'error');
     }
 
-    // Specific API methods
+    // --- Specific API methods ---
+
+    // NEW FUNCTION: Uses the dedicated external link
+    async getPurchaseOrders() {
+        // Ang Procurement API ay nagbabalik ng raw array, kaya ginagamit natin ang makeRequest.
+        return this.makeRequest(this.endpoints.procurementPO, 'GET');
+    }
+
     async getFrontDeskData() {
         return this.makeRequest(`${this.endpoints.frontDesk}?action=get_dashboard_data`);
     }
@@ -254,6 +286,7 @@ class APIClient {
     }
 
     async getWarehouseData() {
+         // Kukunin ang Inventory Summary mula sa internal LOG1 API
         return this.makeRequest(`${this.endpoints.warehousing}?action=get_inventory_summary`);
     }
 
@@ -278,7 +311,7 @@ class APIClient {
         });
     }
 
-    // Utility methods
+    // --- Utility methods ---
     generateRequestId() {
         return 'req_' + Date.now() + '_' + Math.random().toString(36).substr(2, 9);
     }
