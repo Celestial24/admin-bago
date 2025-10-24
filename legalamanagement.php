@@ -249,6 +249,41 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             $error_message = "Failed to upload contract.";
         }
     }
+
+    // Handle PDF Export (Idinagdag para sa PDF Report na may Password)
+    if (isset($_POST['action']) && $_POST['action'] === 'export_pdf') {
+        $password = 'legal2025'; // Password para sa PDF Report (Simulasyon)
+        
+        // Kunin ang lahat ng data ng kontrata para sa ulat
+        $query = "SELECT contract_name, risk_level, risk_score, analysis_summary FROM contracts ORDER BY created_at DESC";
+        $stmt = $db->prepare($query);
+        $stmt->execute();
+        $contracts_to_report = $stmt->fetchAll(PDO::FETCH_ASSOC);
+
+        // --- SIMULASYON NG PDF GENERATION (Dahil hindi available ang external libraries) ---
+        
+        // I-set ang headers para sa pag-download ng file (ginamit ang .txt para sa simulation)
+        header('Content-Type: application/octet-stream'); 
+        header('Content-Disposition: attachment; filename="Legal_Contracts_Report_Protected.txt"');
+        
+        // Mag-output ng simpleng text na nagsasabi na nag-generate ng protected file
+        echo "========================================================\n";
+        echo "== NAKA-PROTEKTANG PDF REPORT NG KONTRATA (SIMULASYON) ==\n";
+        echo "========================================================\n\n";
+        echo "Ipinagbabawal ang pagtingin nang walang pahintulot.\n";
+        echo "Ito ay naglalaman ng sensitibong legal na impormasyon.\n\n";
+        echo "========================================================\n";
+        echo "PASSWORD SA PAGBUKAS NG PDF (Ito ang kailangan mo sa totoong PDF): " . $password . "\n";
+        echo "========================================================\n\n";
+        
+        echo "Kontrata sa Report:\n";
+        foreach ($contracts_to_report as $contract) {
+            echo "- " . $contract['contract_name'] . " (Risk: " . $contract['risk_level'] . ", Score: " . $contract['risk_score'] . "/100)\n";
+            echo "  Buod ng Pagsusuri: " . $contract['analysis_summary'] . "\n";
+        }
+        
+        exit;
+    }
 }
 
 // Fetch employees from database
@@ -868,9 +903,15 @@ try {
             <div class="content-section" id="contracts">
                 <div class="section-header">
                     <h2 class="section-title">Contracts <span class="ai-badge">AI-Powered Analysis</span></h2>
-                    <button class="add-btn" id="addContractBtn">
-                        <i>+</i> Upload Contract
-                    </button>
+                    <div style="display: flex; gap: 10px;">
+                        <!-- Button para sa Secured PDF Report (Idinagdag) -->
+                        <button class="add-btn" id="exportPdfBtn" style="background: #e74c3c; /* Pula para sa ulat */">
+                            &#x1F4C4; Generate Secured PDF
+                        </button>
+                        <button class="add-btn" id="addContractBtn">
+                            <i>+</i> Upload Contract
+                        </button>
+                    </div>
                 </div>
 
                 <!-- Add Contract Form -->
@@ -897,7 +938,7 @@ try {
                         </div>
                         
                         <div class="ai-analysis-section">
-                            <h4>🤖 AI Risk Assessment</h4>
+                            <h4>､AI Risk Assessment</h4>
                             <p><strong>Note:</strong> Our AI system will automatically analyze your contract for:</p>
                             <ul>
                                 <li>Financial risk factors (lease terms, rent structure)</li>
@@ -911,7 +952,7 @@ try {
                         <div class="form-actions">
                             <button type="button" class="cancel-btn" id="cancelContractBtn">Cancel</button>
                             <button type="submit" class="save-btn" name="add_contract" id="saveContractBtn">
-                                <i>🤖</i> Upload & Analyze Contract
+                                <i>､/i> Upload & Analyze Contract
                             </button>
                         </div>
                     </form>
@@ -1457,6 +1498,30 @@ try {
                 document.getElementById('addMemberBtn')?.addEventListener('click', function() {
                     alert('Team member addition form would appear here');
                 });
+
+                // === PDF Export Button Handler (Idinagdag) ===
+                document.getElementById('exportPdfBtn')?.addEventListener('click', function() {
+                    const password = 'legal2025'; // I-display ang password para sa demo
+                    
+                    // Gumamit ng custom modal para sa mas magandang UI, pero gumamit muna ng confirm()
+                    const confirmation = confirm("Sigurado ka bang gusto mong i-download ang Secured PDF Report?\n\n***SIMULATION LAMANG***\nAng totoong PDF ay may password na: " + password + "\n\nPindutin ang OK upang magpatuloy sa pag-download. Ang file ay magiging .txt file sa demo na ito.");
+
+                    if (confirmation) {
+                        // I-submit ang form para ma-trigger ang PHP export logic
+                        const form = document.createElement('form');
+                        form.method = 'POST';
+                        form.action = ''; // Ipadala sa sariling page
+
+                        const actionInput = document.createElement('input');
+                        actionInput.type = 'hidden';
+                        actionInput.name = 'action';
+                        actionInput.value = 'export_pdf';
+
+                        form.appendChild(actionInput);
+                        document.body.appendChild(form);
+                        form.submit();
+                    }
+                });
             }
         });
 
@@ -1544,7 +1609,7 @@ try {
                 const html = `
                     <div style="line-height:1.6;">
                         <div class="ai-analysis-section">
-                            <h4>🤖 AI Risk Analysis Report</h4>
+                            <h4>､AI Risk Analysis Report</h4>
                             <p><strong>Contract:</strong> ${contractData.contract_name}</p>
                             <p><strong>Case ID:</strong> ${contractData.case_id}</p>
                             <p><strong>Risk Level:</strong> <span class="status-badge status-${contractData.risk_level.toLowerCase()}">${contractData.risk_level}</span></p>
@@ -1553,14 +1618,14 @@ try {
                         </div>
                         
                         <div class="ai-analysis-section">
-                            <h5>🔍 Identified Risk Factors</h5>
+                            <h5>剥 Identified Risk Factors</h5>
                             <div class="risk-factors">
                                 ${riskFactorsHtml || '<div class="risk-factor-item">No risk factors detected</div>'}
                             </div>
                         </div>
                         
                         <div class="ai-analysis-section">
-                            <h5>💡 AI Recommendations</h5>
+                            <h5>庁 AI Recommendations</h5>
                             <div class="recommendations">
                                 ${recommendationsHtml || '<div class="recommendation-item">No recommendations available</div>'}
                             </div>
