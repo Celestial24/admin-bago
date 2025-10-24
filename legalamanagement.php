@@ -1566,10 +1566,13 @@ try {
             function openPinModal(actionType, contractData = null) {
                 actionPinError.style.display = 'none';
                 pinDigitsAction.forEach(input => input.value = '');
+                
+                // FIXED: Set display to flex to make the modal visible
                 pinModal.style.display = 'flex';
                 
                 pendingAction = { type: actionType, data: contractData };
                 
+                // FIXED: Focus on the first input correctly
                 if(pinDigitsAction.length > 0) pinDigitsAction[0].focus();
             }
 
