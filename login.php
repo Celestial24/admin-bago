@@ -83,20 +83,6 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['username']) && isset(
         $error_message = 'Please enter both email and password.';
     }
 }
-
-// PIN authentication logic
-if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['pin'])) {
-    $entered_pin = $_POST['pin'] ?? '';
-    
-    // Default PIN is 1234
-    if ($entered_pin === '1234') {
-        $_SESSION['authenticated'] = true;
-        header('Location: dashboard.php');
-        exit;
-    } else {
-        $error_message = "Invalid PIN. Please try again.";
-    }
-}
 ?>
 <!DOCTYPE html>
 <html lang="en" class="scroll-smooth">
@@ -261,21 +247,49 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['pin'])) {
         </div>
       <?php endif; ?>
 
-      <!-- Login form -->
-      <form method="POST" action="">
-        <div class="form-group">
-            <label for="pin">Enter PIN</label>
-            <input type="password" 
-                   name="pin" 
-                   id="pin" 
-                   maxlength="4" 
-                   class="form-control" 
-                   required>
+      <form method="POST" class="space-y-4" novalidate>
+        <!-- Email/Username -->
+        <div class="field">
+          <input id="username" name="username" type="email" autocomplete="email" class="input peer" placeholder=" " required aria-describedby="userHelp">
+          <label for="username" class="float-label">Email Address</label>
+          <span class="icon-right" aria-hidden="true">
+            <svg width="20" height="20" viewBox="0 0 24 24" fill="none"><path d="M20 4H4c-1.1 0-1.99.9-1.99 2L2 18c0 1.1.9 2 2 2h16c1.1 0 2-.9 2-2V6c0-1.1-.9-2-2-2zm0 4l-8 5-8-5V6l8 5 8-5v2z" fill="currentColor"/></svg>
+          </span>
+          <p id="userHelp" class="mt-1 text-xs text-slate-500 dark:text-slate-400">e.g., <span class="font-mono">admin@atiera-hotel.com</span> or <span class="font-mono">admin</span></p>
         </div>
-        <?php if (isset($error)): ?>
-            <div class="alert alert-danger"><?php echo $error; ?></div>
-        <?php endif; ?>
-        <button type="submit" class="btn btn-primary">Login</button>
+
+        <!-- Password -->
+        <div>
+          <div class="flex items-center justify-between mb-1">
+            <label for="password" class="block text-sm font-medium text-slate-700 dark:text-slate-300">Password</label>
+            <span id="capsNote" class="hidden text-xs px-2 py-0.5 rounded bg-amber-50 border border-amber-300 text-amber-800 dark:bg-amber-900/30 dark:border-amber-700 dark:text-amber-200">Caps Lock is ON</span>
+          </div>
+          <div class="field">
+            <input id="password" name="password" type="password" autocomplete="current-password" class="input pr-12 peer" placeholder=" " required>
+            <label for="password" class="float-label">••••••••</label>
+            <div class="icon-right flex items-center gap-1">
+              <button type="button" id="togglePw" class="w-9 h-9 rounded-lg hover:bg-slate-100 dark:hover:bg-slate-800 flex items-center justify-center" aria-label="Show password" aria-pressed="false" title="Show/Hide password">
+                <svg id="eyeOn" width="18" height="18" viewBox="0 0 24 24" fill="none"><path d="M12 5C7 5 2.73 8.11 1 12c1.73 3.89 6 7 11 7s9.27-3.11 11-7c-1.73-3.89-6-7-11-7Zm0 11a4 4 0 1 1 4-4 4 4 0 0 1-4 4Z" fill="currentColor"/></svg>
+                <svg id="eyeOff" class="hidden" width="18" height="18" viewBox="0 0 24 24" fill="none"><path d="M3 4.27 4.28 3 21 19.72 19.73 21l-2.2-2.2A11.73 11.73 0 0 1 12 19c-5 0-9.27-3.11-11-7a12.71 12.71 0 0 1 4.1-4.73L3 4.27ZM12 7a5 5 0 0 1 5 5 5 5 0 0 1-.46 2.11L14.6 12.17A2.5 2.5 0 0 0 11.83 9.4L9.9 7.46A4.84 4.84 0 0 1 12 7Z" fill="currentColor"/></svg>
+              </button>
+            </div>
+          </div>
+
+          <!-- Strength meter -->
+          <div class="mt-2 flex items-center gap-2">
+            <div class="h-1.5 flex-1 rounded bg-slate-200 dark:bg-slate-700 overflow-hidden" aria-hidden="true">
+              <div id="pwBar" class="h-full w-1/12 bg-blue-600 dark:bg-blue-500"></div>
+            </div>
+            <span id="pwLabel" class="text-xs text-slate-500 dark:text-slate-400 w-14 text-right">weak</span>
+          </div>
+        </div>
+
+        <!-- Submit -->
+        <button id="submitBtn" type="submit" class="btn" aria-live="polite">
+          <span id="btnText">Sign In</span>
+        </button>
+
+        <p class="text-xs text-center text-slate-500 dark:text-slate-400">© 2025 ATIERA BSIT 4101 CLUSTER 1</p>
       </form>
     </div>
   </main>
