@@ -768,7 +768,7 @@ function formatFileSize($bytes) {
                 <h3>Categories</h3>
                 <ul>
                     <li><a href="#" class="active">All Documents</a></li>
-                    <li><a href="#">Financial Records</a></li>
+                    <li><a href="fn.php">Financial Records</a></li>
                     <li><a href="#">HR Documents</a></li>
                     <li><a href="#">Guest Records</a></li>
                     <li><a href="#">Inventory</a></li>
